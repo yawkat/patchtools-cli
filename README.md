@@ -1,6 +1,8 @@
 patchtools-cli
 ==============
 
+[![Build Status](http://ci.yawk.at/job/patchtools-cli/badge/icon)](http://ci.yawk.at/job/patchtools-cli/)
+
 Usage
 -----
 
