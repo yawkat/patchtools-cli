@@ -9,9 +9,11 @@ import java.util.function.Consumer;
 import java.util.stream.Stream;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.objectweb.asm.ClassWriter;
 import uk.co.thinkofdeath.patchtools.Patcher;
 import uk.co.thinkofdeath.patchtools.wrappers.ClassPathWrapper;
 import uk.co.thinkofdeath.patchtools.wrappers.ClassSet;
+import uk.co.thinkofdeath.patchtools.wrappers.ClassWrapper;
 
 /**
  * @author yawkat
@@ -55,12 +57,15 @@ public class Runner {
                         .filter(path -> {
                             String className = path.toString();
                             if (className.startsWith("/")) { className = className.substring(1); }
-                            className = className.substring(0, className.length() - 6);
+                            className = className.substring(0, className.length() - 6); // remove .class
                             className = className.replace('/', '.');
                             for (ClassMatcher matcher : matchers) {
                                 Optional<Boolean> include = matcher.include(className);
                                 log.trace("Match {} @ {} = {}", className, matcher, include);
                                 if (include.isPresent()) {
+                                    if (log.isDebugEnabled() && include.get()) {
+                                        log.debug("Including {} according to {}", className, matcher);
+                                    }
                                     return include.get();
                                 }
                             }
@@ -112,8 +117,8 @@ public class Runner {
         if (command.startsWith("//")) {
             command = command.substring(2);
             prefixChars = 2;
-        } else if (command.startsWith("#")) { // # is currently not supported by patchtools but will probably be added
-            command = command.substring(1);
+        } else if (command.startsWith("#")) {
+            command = command.substring(1, command.length() - 1); // remove last char too
             prefixChars = 1;
         } else if (command.trim().isEmpty()) {
             buffered.readLine();
@@ -157,13 +162,17 @@ public class Runner {
         Files.copy(inputJar, outputJar, StandardCopyOption.REPLACE_EXISTING);
         try (FileSystem targetFs = openZipFs(outputJar)) {
             for (String className : ImmutableList.copyOf(classSet)) {
-                log.debug("Storing class {}", className);
                 String classFileName = className.replace('.', '/') + ".class";
-                byte[] bytes = classSet.getClass(className);
-                if (bytes == null) {
-                    log.debug("Got null bytes for class {}, is it hidden?", className);
+                ClassWrapper wrapper = classSet.getClassWrapper(className);
+                assert wrapper != null;
+                if (wrapper.isHidden()) {
+                    log.debug("Skipping hidden class {}", className);
                     continue;
                 }
+                log.debug("Storing class {}", className);
+                ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
+                wrapper.getNode().accept(writer);
+                byte[] bytes = writer.toByteArray();
                 log.trace("{} bytes", bytes.length);
                 Files.write(targetFs.getPath(classFileName), bytes, StandardOpenOption.TRUNCATE_EXISTING);
             }

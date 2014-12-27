@@ -47,7 +47,7 @@ public class WildcardBuilder {
     public WildcardBuilder appendSingleExpression() {
         State beforeSeparator = new State();
         State afterSeparator = new State();
-        afterSeparator.setAccept(true);
+        beforeSeparator.setAccept(true);
 
         State next = afterSeparator;
         for (int i = separator.length() - 1; i >= 0; i--) {
@@ -55,7 +55,7 @@ public class WildcardBuilder {
             State entry = i == 0 ? beforeSeparator : new State();
             entry.addTransition(new Transition(c, next));
             if (c != '\0') { entry.addTransition(new Transition('\0', (char) (c - 1), beforeSeparator)); }
-            if (c != '\uffff') { entry.addTransition(new Transition((char) (c - 1), '\uffff', beforeSeparator)); }
+            if (c != '\uffff') { entry.addTransition(new Transition((char) (c + 1), '\uffff', beforeSeparator)); }
             next = entry;
         }
 
